@@ -191,7 +191,7 @@ function InfoPanel({ box, onClose }: { box: any; onClose: () => void }) {
 }
 
 // ─── Pagina principale ───────────────────────────────────────────────────────
-export default function Pallet3DPage() {
+function PalletContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const palletId = Number(searchParams.get('pallet') || '1');
@@ -370,5 +370,17 @@ function SceneWithPanel({ pallet, colorMap, onSelectBox, selectedBox }: {
                 dampingFactor={0.08}
             />
         </>
+    );
+}
+
+export default function Pallet3DPage() {
+    return (
+        <Suspense fallback={
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F2447', color: '#93C5FD' }}>
+                <div style={{ textAlign: 'center', fontSize: 24 }}>Caricamento 3D...</div>
+            </div>
+        }>
+            <PalletContent />
+        </Suspense>
     );
 }
