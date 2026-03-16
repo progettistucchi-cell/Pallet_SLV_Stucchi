@@ -1,0 +1,10 @@
+SUCCESS: True
+N_PALLET: 4
+BOXING: Totali=112, Piene=112, Parziali=0
+WARNINGS: {'prodotti_non_trovati': ['4551120260003', '4551520360003', '4551120660003', '4551120860003', '4551121360003', '4551121160003', '999066SLV0003'], 'skippati_db': [], 'prodotti_skippati_sap': []}
+
+=== PALLET ===
+  Pallet 1: 4 layers, 24 scatole, H=1470mm, Fill=82.7%
+  Pallet 2: 5 layers, 30 scatole, H=1450mm, Fill=71.9%
+  Pallet 3: 5 layers, 30 scatole, H=1450mm, Fill=67.5%
+  Pallet 4: 2 layers, 28 scatole, H=430mm, Fill=57.0%
