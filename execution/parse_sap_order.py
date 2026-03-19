@@ -92,8 +92,27 @@ def parse_sap_order(file_path: str) -> dict:
     if len(rows) < 2:
         raise ValueError("File SAP vuoto o non valido.")
 
-    # Prima riga = header → skip
-    header = rows[0]
+    # Mappatura dinamica delle colonne
+    header = [str(x).strip().lower() for x in rows[0]]
+    
+    # Indici di default fallback (per file senza header corretti)
+    col_cliente = COL_CLIENTE
+    col_nome = COL_NOME
+    col_dt = COL_DT_ORDACQ
+    col_mat = COL_COD_MATERIALE_CLIENTE
+    col_qta = COL_QTA_ORD
+
+    for i, h in enumerate(header):
+        if h == "cliente" or "codice cliente" in h:
+            col_cliente = i
+        elif h == "nome 1" or h == "nome cliente" or h == "nome":
+            col_nome = i
+        elif "data" in h and "ordine" in h:
+            col_dt = i
+        elif h == "materiale" or "cod. materiale" in h or "codice materiale" in h:
+            col_mat = i
+        elif "qta" in h or "qtà" in h or "quantità" in h or "q.tà" in h:
+            col_qta = i
 
     # Variabili da estrarre al volo
     cliente = ""
@@ -103,13 +122,15 @@ def parse_sap_order(file_path: str) -> dict:
     prodotti = []
     prodotti_skippati = []
 
+    # Indice max necessario per il padding
+    max_idx = max(col_cliente, col_nome, col_dt, col_mat, col_qta)
+
     for cols in rows[1:]:
         # Pad colonne mancanti
-        while len(cols) <= max(COL_CLIENTE, COL_NOME, COL_DT_ORDACQ,
-                               COL_COD_MATERIALE_CLIENTE, COL_QTA_ORD):
+        while len(cols) <= max_idx:
             cols.append('')
 
-        col_cliente_val = cols[COL_CLIENTE].strip()
+        col_cliente_val = cols[col_cliente].strip()
 
         # Skip righe aggregate (es. "*" = totale di gruppo)
         if col_cliente_val.startswith('*'):
@@ -118,17 +139,18 @@ def parse_sap_order(file_path: str) -> dict:
         # Recupera metadati cliente dalla prima riga dati
         if not cliente and col_cliente_val and not col_cliente_val.startswith('*'):
             cliente = col_cliente_val
-            nome_cliente = cols[COL_NOME].strip()
-            data_ordine = cols[COL_DT_ORDACQ].strip()
+            nome_cliente = cols[col_nome].strip()
+            data_ordine = cols[col_dt].strip()
 
-        cod_prodotto = cols[COL_COD_MATERIALE_CLIENTE].strip()
-        qta_str = cols[COL_QTA_ORD].strip()
+        cod_prodotto = cols[col_mat].strip()
+        qta_str = cols[col_qta].strip()
 
         # Skip righe senza codice prodotto
         if not cod_prodotto:
-            # Controlla se è la riga con numero ordine (col [6] = Materiale)
-            if len(cols) > 6 and cols[6].strip() and not cols[6].strip().startswith('*'):
-                numero_ordine = cols[6].strip()
+            # Controlla se è la riga con numero ordine (col [6] = Materiale nel vecchio layout, cerchiamo doc. vendita o consegna)
+            for i, h in enumerate(header):
+                if h == "doc. vendita" and cols[i].strip():
+                    numero_ordine = cols[i].strip()
             continue
 
         # Skip righe con codice che inizia per "*" (subtotali)
