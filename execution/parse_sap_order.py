@@ -66,16 +66,34 @@ def parse_sap_order(file_path: str) -> dict:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File SAP non trovato: {file_path}")
 
-    # Lettura UTF-16 con BOM
-    with open(file_path, encoding='utf-16') as f:
-        content = f.read()
+    # Tentativo 1: Lettura UTF-16 TSV (Formato SAP nativo finto Excel)
+    rows = []
+    try:
+        with open(file_path, encoding='utf-16') as f:
+            content = f.read()
+            
+        if not content.strip():
+            raise ValueError("File vuoto")
+            
+        for line in content.strip().split('\n'):
+            rows.append(line.split('\t'))
+            
+    except (UnicodeError, ValueError):
+        # Tentativo 2: Lettura vero file Excel Binario (.xlsx)
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(file_path, data_only=True)
+            sheet = wb.active
+            for row in sheet.iter_rows(values_only=True):
+                rows.append([str(c).strip() if c is not None else "" for c in row])
+        except Exception as e:
+            raise ValueError(f"Formato file non riconosciuto. Non è né un TSV UTF-16 né un vero Excel .xlsx: {str(e)}")
 
-    lines = content.strip().split('\n')
-    if len(lines) < 2:
+    if len(rows) < 2:
         raise ValueError("File SAP vuoto o non valido.")
 
     # Prima riga = header → skip
-    header = lines[0].split('\t')
+    header = rows[0]
 
     # Variabili da estrarre al volo
     cliente = ""
@@ -85,9 +103,7 @@ def parse_sap_order(file_path: str) -> dict:
     prodotti = []
     prodotti_skippati = []
 
-    for line in lines[1:]:
-        cols = line.split('\t')
-
+    for cols in rows[1:]:
         # Pad colonne mancanti
         while len(cols) <= max(COL_CLIENTE, COL_NOME, COL_DT_ORDACQ,
                                COL_COD_MATERIALE_CLIENTE, COL_QTA_ORD):
