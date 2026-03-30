@@ -30,7 +30,8 @@ export default function HomePage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/palletize', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/palletize`, {
         method: 'POST',
         body: formData,
       });

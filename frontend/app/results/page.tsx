@@ -183,7 +183,7 @@ function PalletCard({ pallet, imgFilenames }: { pallet: Pallet; imgFilenames?: s
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                     key={filename}
-                                    src={`/api/images/${filename}`}
+                                    src={`${process.env.NEXT_PUBLIC_API_URL || ''}/api/images/${filename}`}
                                     alt={`Pallet ${pallet.pallet_id} step ${i + 1}`}
                                     style={{ flex: '0 0 100%', width: '100%', borderRadius: 4, display: 'block', pointerEvents: 'none', objectFit: 'contain' }}
                                 />
@@ -353,7 +353,7 @@ export default function ResultsPage() {
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     {result.pdf_filename && (
                         <a
-                            href={`/api/download-pdf/${result.pdf_filename}`}
+                            href={`${process.env.NEXT_PUBLIC_API_URL || ''}/api/download-pdf/${result.pdf_filename}`}
                             download
                             style={{
                                 padding: '0.6rem 1.25rem',
