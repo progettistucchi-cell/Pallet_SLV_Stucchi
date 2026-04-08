@@ -234,6 +234,135 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
     pallet_id = 1
 
     while remaining_boxes:
+
+        # ─── Vincolo 3 Pre-check: le scatole rimanenti coprono l'80% base? ──────
+        # Calcola footprint massima potenziale delle scatole restanti.
+        # Se < 80% di 800x1200 E esiste già almeno un pallet → eccesso sull'ultimo.
+        if pallet_list:
+            area_potenziale = sum(
+                max(pl * pp for pl, pp, h, _ in get_orientations(b))
+                for b in remaining_boxes
+            )
+            if area_potenziale < MIN_BASE_COVERAGE * PALLET_L * PALLET_P:
+                # Tutte le scatole rimanenti vanno sull'ultimo pallet come eccesso
+                placed_last = [
+                    b for layer in pallet_list[-1]['layers']
+                    for b in layer['scatole']
+                ]
+                eccesso_placed: List[Dict] = []
+
+                for box in remaining_boxes:
+                    box_orients = get_orientations(box)
+                    best_z = float('inf')
+                    best_score = float('inf')
+                    best_pl: Optional[Dict] = None
+                    tutti_finora = placed_last + eccesso_placed
+
+                    cand_x, cand_y = get_candidates(tutti_finora)
+
+                    for pl, pp, height, label in box_orients:
+                        for x in cand_x:
+                            if x + pl > PALLET_L_MAX:
+                                continue
+                            for y in cand_y:
+                                if y + pp > PALLET_P_MAX:
+                                    continue
+                                z = 0
+                                for b in tutti_finora:
+                                    if not (x >= b['pos_x_mm'] + b['placed_l_mm'] or
+                                            x + pl <= b['pos_x_mm'] or
+                                            y >= b['pos_y_mm'] + b['placed_p_mm'] or
+                                            y + pp <= b['pos_y_mm']):
+                                        top = b['pos_z_mm'] + b['a_mm']
+                                        if top > z:
+                                            z = top
+                                # NESSUN limite altezza per le scatole in eccesso
+                                if not check_support(x, y, z, pl, pp, tutti_finora):
+                                    continue
+                                score = x + y
+                                eps = 1e-5
+                                if z < best_z - eps or (abs(z - best_z) < eps and score < best_score):
+                                    best_z = z
+                                    best_score = score
+                                    is_rot = (pl != box['l_mm'] or pp != box['p_mm'])
+                                    best_pl = dict(
+                                        box,
+                                        pos_x_mm=x, pos_y_mm=y, pos_z_mm=z,
+                                        placed_l_mm=pl, placed_p_mm=pp, a_mm=height,
+                                        rotated=is_rot, orientation_label=label,
+                                        eccesso=True
+                                    )
+
+                    if best_pl:
+                        eccesso_placed.append(best_pl)
+                    else:
+                        # Fallback: impila sopra al punto più alto
+                        max_z = max(
+                            (b['pos_z_mm'] + b['a_mm'] for b in placed_last + eccesso_placed),
+                            default=0
+                        )
+                        pl0, pp0, h0, lbl0 = box_orients[0]
+                        eccesso_placed.append(dict(
+                            box,
+                            pos_x_mm=0, pos_y_mm=0, pos_z_mm=max_z,
+                            placed_l_mm=pl0, placed_p_mm=pp0, a_mm=h0,
+                            rotated=False, orientation_label=lbl0,
+                            eccesso=True
+                        ))
+
+                if eccesso_placed:
+                    nomi_eccesso = list({
+                        f"{b['codice_scatola']} ({b['cod_prodotto']})"
+                        for b in eccesso_placed
+                    })
+                    warning_eccesso = (
+                        f"SCATOLE IN ECCESSO (copertura base < 80%): "
+                        f"{', '.join(nomi_eccesso)}. "
+                        f"Posizionate sopra l'ultimo pallet (sbordo altezza)."
+                    )
+                    print(f"  ATTENZIONE: {warning_eccesso}")
+
+                    tutti = placed_last + eccesso_placed
+                    z_grp: Dict[int, List[Dict]] = {}
+                    max_h_e = 0
+                    vol_e = 0
+                    for b in tutti:
+                        zz = b['pos_z_mm']
+                        if zz not in z_grp:
+                            z_grp[zz] = []
+                        z_grp[zz].append(b)
+                        th = b['pos_z_mm'] + b['a_mm']
+                        if th > max_h_e:
+                            max_h_e = th
+                        vol_e += b['placed_l_mm'] * b['placed_p_mm'] * b['a_mm']
+
+                    layers_e = []
+                    for ln, zz in enumerate(sorted(z_grp.keys()), 1):
+                        biz = z_grp[zz]
+                        layers_e.append({
+                            "layer_n": ln,
+                            "vez_start_mm": zz,
+                            "altezza_mm": max(b['a_mm'] for b in biz),
+                            "altezza_cumulativa_mm": zz + max(b['a_mm'] for b in biz),
+                            "tipo": "PIENA" if any(b['is_piena'] for b in biz) else "PARZIALE",
+                            "scatole": biz
+                        })
+
+                    vp = PALLET_L * PALLET_P * max_h_e
+                    pallet_list[-1].update({
+                        "layers": layers_e,
+                        "altezza_totale_mm": max_h_e,
+                        "n_scatole": len(tutti),
+                        "volume_usato_mm3": vol_e,
+                        "volume_pallet_mm3": vp,
+                        "fill_pct": round((vol_e / vp) * 100, 1) if vp > 0 else 0,
+                        "copertura_base_pct": round(calcola_copertura_base(placed_last) * 100, 1),
+                        "warning_copertura": warning_eccesso,
+                        "scatole_eccesso": nomi_eccesso,
+                    })
+                break  # Tutte le scatole gestite, fine ciclo
+
+        # ─── Posizionamento normale sul nuovo pallet ──────────────────────────
         placed: List[Dict] = []
         new_remaining: List[Dict] = []
 
@@ -246,15 +375,12 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
             orientations = get_orientations(box)
 
             for pl, pp, height, label in orientations:
-                # Vincolo dimensioni: con tolleranza
                 for x in cand_x:
                     if x + pl > PALLET_L_MAX:
                         continue
                     for y in cand_y:
                         if y + pp > PALLET_P_MAX:
                             continue
-
-                        # Trova la Z di "caduta"
                         z = 0
                         for b in placed:
                             if not (x >= b['pos_x_mm'] + b['placed_l_mm'] or
@@ -264,16 +390,10 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
                                 top = b['pos_z_mm'] + b['a_mm']
                                 if top > z:
                                     z = top
-
-                        # Vincolo 2: altezza max con tolleranza
                         if z + height > PALLET_H_MAX:
                             continue
-
-                        # Stabilità fisica (70% appoggio)
                         if not check_support(x, y, z, pl, pp, placed):
                             continue
-
-                        # Score Bottom-Left: priorità a Z bassa, poi a posizione X+Y bassa
                         score = x + y
                         eps = 1e-5
                         if z < best_z - eps or (abs(z - best_z) < eps and score < best_score):
@@ -282,14 +402,10 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
                             is_rotated = (pl != box['l_mm'] or pp != box['p_mm'])
                             best_placement = dict(
                                 box,
-                                pos_x_mm=x,
-                                pos_y_mm=y,
-                                pos_z_mm=z,
-                                placed_l_mm=pl,
-                                placed_p_mm=pp,
-                                a_mm=height,          # altezza effettiva sul pallet
-                                rotated=is_rotated,
-                                orientation_label=label
+                                pos_x_mm=x, pos_y_mm=y, pos_z_mm=z,
+                                placed_l_mm=pl, placed_p_mm=pp, a_mm=height,
+                                rotated=is_rotated, orientation_label=label,
+                                eccesso=False
                             )
 
             if best_placement:
@@ -300,20 +416,8 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
         if not placed:
             break
 
-        # ─── Vincolo 3: copertura base 80% ─────────────────────────────────
         copertura = calcola_copertura_base(placed)
         warning_copertura = None
-        if copertura < MIN_BASE_COVERAGE:
-            scatole_a_terra = [
-                f"{b['codice_scatola']} ({b['cod_prodotto']})"
-                for b in placed if b['pos_z_mm'] == 0
-            ]
-            warning_copertura = (
-                f"Copertura base {copertura:.0%} < 80% richiesta. "
-                f"Scatole al layer base: {', '.join(scatole_a_terra) if scatole_a_terra else 'nessuna'}. "
-                f"Le scatole non posizionate alla base sono state spostate al pallet successivo."
-            )
-            print(f"  ATTENZIONE Pallet {pallet_id}: {warning_copertura}")
 
         # ─── Costruisci Pseudo-Layers (retrocompatibilità PDF/Immagini) ─────
         z_groups: Dict[int, List[Dict]] = {}
@@ -392,7 +496,7 @@ def genera_report_testuale_3d(pallet_list: List[Dict]) -> str:
             f"Copertura base: {pallet.get('copertura_base_pct', '?')}%"
         )
         if pallet.get('warning_copertura'):
-            lines.append(f"  ⚠️  {pallet['warning_copertura']}")
+            lines.append(f"  \u26a0\ufe0f  {pallet['warning_copertura']}")
         lines.append(f"{'-'*60}")
 
         for step in pallet['layers']:
@@ -403,9 +507,12 @@ def genera_report_testuale_3d(pallet_list: List[Dict]) -> str:
             for box in step['scatole']:
                 orient = box.get('orientation_label', '')
                 orient_str = f" [{orient}]" if orient else ""
+                eccesso_str = " *** ECCESSO ***" if box.get('eccesso') else ""
                 lines.append(
-                    f"    • {box['cod_prodotto']} | {box['codice_scatola']} | "
-                    f"{box['placed_l_mm']}x{box['placed_p_mm']}x{box['a_mm']}mm{orient_str} | "
+                    f"    {'\u26a0\ufe0f ' if box.get('eccesso') else '\u2022 '}"
+                    f"{box['cod_prodotto']} | {box['codice_scatola']} | "
+                    f"{box['placed_l_mm']}x{box['placed_p_mm']}x{box['a_mm']}mm"
+                    f"{orient_str}{eccesso_str} | "
                     f"Pos: (X:{box['pos_x_mm']}, Y:{box['pos_y_mm']}, Z:{box['pos_z_mm']})mm"
                 )
         lines.append("")
