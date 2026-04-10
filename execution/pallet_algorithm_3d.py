@@ -120,21 +120,29 @@ def ordina_scatole_con_vincolo(boxes: List[Dict]) -> List[Dict]:
 
         by_scatola[cs][cp].append(box)
 
+    # Opzione A: ordina i GRUPPI per footprint (l_mm x p_mm) decrescente.
+    # Le scatole con base piu' grande vanno sempre posizionate per prime (in basso).
+    # L'ordine dei prodotti DENTRO ogni gruppo rimane invariato (Vincolo 5).
+    def footprint_gruppo(cs: str) -> int:
+        primo_prodotto = next(iter(by_scatola[cs].values()))
+        b = primo_prodotto[0]
+        return b['l_mm'] * b['p_mm']
+
+    scatola_order_sorted = sorted(scatola_order, key=footprint_gruppo, reverse=True)
+
     result: List[Dict] = []
-    for cs in scatola_order:
+    for cs in scatola_order_sorted:
         prodotti_group = by_scatola[cs]
-        prodotti_keys = list(prodotti_group.keys())  # ordine originale
+        prodotti_keys = list(prodotti_group.keys())  # ordine originale prodotti
 
         if len(prodotti_keys) == 1:
-            # Un solo prodotto: ordinamento libero per ottimizzazione (altezza desc)
+            # Un solo prodotto: piene prima, poi parziali
             boxes_cp = prodotti_group[prodotti_keys[0]]
-            piene = sorted([b for b in boxes_cp if b['is_piena']],
-                           key=lambda x: (x['a_mm'], x['l_mm'] * x['p_mm']), reverse=True)
-            parziali = sorted([b for b in boxes_cp if not b['is_piena']],
-                              key=lambda x: (x['a_mm'], x['l_mm'] * x['p_mm']), reverse=True)
+            piene = [b for b in boxes_cp if b['is_piena']]
+            parziali = [b for b in boxes_cp if not b['is_piena']]
             result.extend(piene + parziali)
         else:
-            # Più prodotti condividono la stessa scatola → ordine prodotto obbligatorio
+            # Piu' prodotti condividono la stessa scatola: ordine prodotto obbligatorio (Vincolo 5)
             for cp in prodotti_keys:
                 boxes_cp = prodotti_group[cp]
                 piene = [b for b in boxes_cp if b['is_piena']]
