@@ -187,7 +187,7 @@ function SceneWithPanel({ pallet, colorMap, onSelectBox, selectedBox }: {
     );
 }
 
-export default function Pallet3DPage() {
+function Pallet3DInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const palletId = Number(searchParams.get('pallet') || '1');
@@ -318,5 +318,17 @@ export default function Pallet3DPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Pallet3DPage() {
+    return (
+        <Suspense fallback={
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000000', color: '#888888', fontFamily: 'Inter, sans-serif' }}>
+                <p>Caricamento...</p>
+            </div>
+        }>
+            <Pallet3DInner />
+        </Suspense>
     );
 }
