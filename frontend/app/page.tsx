@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function HomePage() {
   const router = useRouter();
@@ -42,7 +43,6 @@ export default function HomePage() {
         throw new Error(data.detail || 'Errore nel server');
       }
 
-      // Salva risultato in sessionStorage e naviga ai risultati
       sessionStorage.setItem('palletResult', JSON.stringify(data));
       router.push('/results');
     } catch (err: any) {
@@ -55,7 +55,7 @@ export default function HomePage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0F2447 0%, #1A3C6E 50%, #1E4F8A 100%)',
+      background: '#000000',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -63,36 +63,41 @@ export default function HomePage() {
       padding: '2rem',
       fontFamily: 'Inter, sans-serif',
     }}>
-      {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '3rem', animation: 'fadeInUp 0.5s ease' }}>
-        <div style={{
-          width: 70, height: 70, borderRadius: 18,
-          background: 'linear-gradient(135deg, #E87A3C, #F59E0B)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 1.5rem', fontSize: 32,
-          boxShadow: '0 8px 32px rgba(232,122,60,0.4)',
-        }}>📦</div>
+      {/* Logo Stucchi */}
+      <div style={{ marginBottom: '2.5rem', animation: 'fadeInUp 0.4s ease' }}>
+        <Image
+          src="/logo-stucchi-white.png"
+          alt="Stucchi"
+          width={220}
+          height={116}
+          style={{ objectFit: 'contain' }}
+          priority
+        />
+      </div>
+
+      {/* Titolo app */}
+      <div style={{ textAlign: 'center', marginBottom: '2rem', animation: 'fadeInUp 0.5s ease' }}>
         <h1 style={{
-          fontSize: '2.5rem', fontWeight: 800, color: '#FFFFFF',
+          fontSize: '2rem', fontWeight: 700, color: '#FFFFFF',
           margin: 0, letterSpacing: '-0.5px',
         }}>Pallet Optimizer</h1>
-        <p style={{ color: '#94A3B8', fontSize: '1.1rem', marginTop: '0.5rem', fontWeight: 400 }}>
-          SLV Stucchi — Sistema di Ottimizzazione Palletizzazione
+        <p style={{ color: '#666666', fontSize: '0.95rem', marginTop: '0.4rem', fontWeight: 400 }}>
+          Sistema di Ottimizzazione Palletizzazione
         </p>
       </div>
 
       {/* Card Upload */}
       <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        borderRadius: 24, padding: '2.5rem',
-        width: '100%', maxWidth: 560,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
-        backdropFilter: 'blur(10px)',
+        background: '#FFFFFF',
+        borderRadius: 20, padding: '2.5rem',
+        width: '100%', maxWidth: 540,
+        border: '1px solid #E2E8F0',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
       }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1A3C6E', marginTop: 0, marginBottom: '0.25rem' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#1A3C6E', marginTop: 0, marginBottom: '0.25rem' }}>
           Carica Ordine SAP
         </h2>
-        <p style={{ color: '#64748B', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+        <p style={{ color: '#64748B', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
           Carica il file .XLS esportato da SAP per avviare la palletizzazione automatica
         </p>
 
@@ -103,18 +108,18 @@ export default function HomePage() {
           onDragLeave={() => setIsDragging(false)}
           onClick={() => document.getElementById('file-input')?.click()}
           style={{
-            border: `2px dashed ${isDragging ? '#2563EB' : file ? '#16A34A' : '#CBD5E1'}`,
-            borderRadius: 16,
+            border: `2px dashed ${isDragging ? '#E87A3C' : file ? '#16A34A' : '#CBD5E1'}`,
+            borderRadius: 14,
             padding: '2.5rem',
             textAlign: 'center',
             cursor: 'pointer',
-            background: isDragging ? '#EFF6FF' : file ? '#F0FDF4' : '#F8FAFC',
+            background: isDragging ? '#FFF7ED' : file ? '#F0FDF4' : '#F8FAFC',
             transition: 'all 0.2s ease',
             marginBottom: '1.5rem',
           }}
         >
           <div style={{ fontSize: 40, marginBottom: '0.75rem' }}>
-            {file ? '✅' : '📂'}
+            {file ? '\u2705' : '\uD83D\uDCC2'}
           </div>
           {file ? (
             <>
@@ -122,7 +127,7 @@ export default function HomePage() {
                 {file.name}
               </p>
               <p style={{ color: '#64748B', margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
-                {(file.size / 1024).toFixed(1)} KB — Clicca per cambiare
+                {(file.size / 1024).toFixed(1)} KB &mdash; Clicca per cambiare
               </p>
             </>
           ) : (
@@ -131,7 +136,7 @@ export default function HomePage() {
                 Trascina il file qui
               </p>
               <p style={{ color: '#94A3B8', margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
-                oppure clicca per selezionare — .XLS, .XLSX
+                oppure clicca per selezionare &mdash; .XLS, .XLSX
               </p>
             </>
           )}
@@ -147,11 +152,11 @@ export default function HomePage() {
         {/* Errore */}
         {error && (
           <div style={{
-            background: '#FEF2F2', border: '1px solid #FECACA',
+            background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)',
             borderRadius: 10, padding: '0.875rem 1rem',
             color: '#DC2626', fontSize: '0.875rem', marginBottom: '1rem',
           }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
@@ -169,7 +174,7 @@ export default function HomePage() {
             fontSize: '1rem', fontWeight: 700,
             cursor: file && !loading ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease',
-            boxShadow: file && !loading ? '0 4px 14px rgba(232,122,60,0.4)' : 'none',
+            boxShadow: file && !loading ? '0 4px 20px rgba(232,122,60,0.35)' : 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
@@ -183,24 +188,24 @@ export default function HomePage() {
               Elaborazione in corso...
             </>
           ) : (
-            '🚀 Avvia Palletizzazione'
+            'Avvia Palletizzazione'
           )}
         </button>
 
-        {/* Info */}
+        {/* Info pallet */}
         <div style={{
           display: 'flex', gap: '1rem', marginTop: '1.5rem',
-          padding: '1rem', background: '#F8FAFC', borderRadius: 10,
+          padding: '1rem', background: '#F8FAFC',
+          borderRadius: 10, border: '1px solid #E2E8F0',
         }}>
           {[
-            { icon: '📏', label: 'Euro Pallet', value: '80×120 cm' },
-            { icon: '📐', label: 'Altezza Max', value: '160 cm' },
-            { icon: '🔄', label: 'Rotazione', value: 'Ammessa' },
+            { label: 'Euro Pallet', value: '80\u00D7120 cm' },
+            { label: 'Altezza Max', value: '160 cm' },
+            { label: 'Rotazione', value: 'Ammessa' },
           ].map((item) => (
             <div key={item.label} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: 2 }}>{item.icon}</div>
-              <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 500 }}>{item.label}</div>
-              <div style={{ fontSize: '0.8rem', color: '#1A3C6E', fontWeight: 700 }}>{item.value}</div>
+              <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 500, marginBottom: 2 }}>{item.label}</div>
+              <div style={{ fontSize: '0.85rem', color: '#1A3C6E', fontWeight: 700 }}>{item.value}</div>
             </div>
           ))}
         </div>
@@ -208,14 +213,14 @@ export default function HomePage() {
 
       {/* History link */}
       <a href="/history" style={{
-        marginTop: '2rem', color: '#94A3B8',
+        marginTop: '2rem', color: '#444444',
         textDecoration: 'none', fontSize: '0.875rem',
         transition: 'color 0.2s',
       }}
         onMouseEnter={(e) => (e.currentTarget.style.color = '#FFFFFF')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = '#444444')}
       >
-        📋 Storico palletizzazioni →
+        Storico palletizzazioni &rarr;
       </a>
 
       <style>{`

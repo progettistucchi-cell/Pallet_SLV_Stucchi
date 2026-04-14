@@ -1,0 +1,55 @@
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Ambiente virtuale ────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ─── Variabili d'ambiente e credenziali ───────────────────────────────────────
+.env
+*.env
+.env.local
+.env.*.local
+credentials.json
+token.json
+service_account.json
+*.pem
+*.key
+
+# ─── File temporanei ─────────────────────────────────────────────────────────
+.tmp/
+*.tmp
+*.temp
+
+# ─── Next.js ─────────────────────────────────────────────────────────────────
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+frontend/.vercel/
+
+# ─── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

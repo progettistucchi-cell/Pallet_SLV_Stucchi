@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Box, Line } from '@react-three/drei';
+import Image from 'next/image';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-// ─── Stessa palette colori del 2D ────────────────────────────────────────────
 const PALETTE = [
     '#4A90D9', '#E87A3C', '#52B26B', '#9B59B6', '#E74C3C',
     '#1ABC9C', '#F39C12', '#2980B9', '#D35400', '#27AE60',
@@ -24,19 +24,15 @@ function buildColorMap(boxes: any[]): Record<string, string> {
     return map;
 }
 
-// ─── Griglia pavimento ───────────────────────────────────────────────────────
 function PalletFloor({ l, p }: { l: number; p: number }) {
-    // Scala mm → unità Three.js (dividiamo per 100 per avere valori maneggiabili)
     const lU = l / 100;
     const pU = p / 100;
     return (
         <group position={[lU / 2, 0, pU / 2]}>
-            {/* Base */}
             <mesh position={[0, -0.05, 0]}>
                 <boxGeometry args={[lU, 0.1, pU]} />
                 <meshStandardMaterial color="#A0522D" roughness={0.9} />
             </mesh>
-            {/* Griglia di riferimento */}
             <gridHelper
                 args={[Math.max(lU, pU) * 1.2, 10, '#999999', '#CCCCCC']}
                 position={[0, -0.09, 0]}
@@ -45,7 +41,6 @@ function PalletFloor({ l, p }: { l: number; p: number }) {
     );
 }
 
-// ─── Singola scatola 3D ──────────────────────────────────────────────────────
 function Box3D({ box, color, onSelect, isSelected }: {
     box: any;
     color: string;
@@ -53,7 +48,7 @@ function Box3D({ box, color, onSelect, isSelected }: {
     isSelected: boolean;
 }) {
     const [hovered, setHovered] = useState(false);
-    const S = 100; // scala mm → unità Three.js
+    const S = 100;
 
     const lU = box.placed_l_mm / S;
     const pU = box.placed_p_mm / S;
@@ -83,7 +78,7 @@ function Box3D({ box, color, onSelect, isSelected }: {
                     metalness={0.05}
                 />
             </mesh>
-            {/* Bordi sempre visibili */}
+            {/* Bordi sempre visibili per distinguere le scatole */}
             <lineSegments>
                 <edgesGeometry args={[new THREE.BoxGeometry(lU, hU, pU)]} />
                 <lineBasicMaterial
@@ -96,18 +91,77 @@ function Box3D({ box, color, onSelect, isSelected }: {
     );
 }
 
-// ─── Scena 3D principale ─────────────────────────────────────────────────────
-function Scene({ pallet }: { pallet: any }) {
-    const colorMap = buildColorMap(pallet.layers.flatMap((l: any) => l.scatole));
-    const [selectedBox, setSelectedBox] = useState<any>(null);
-
+function Legend({ pallet }: { pallet: any }) {
     const allBoxes = pallet.layers.flatMap((l: any) => l.scatole);
+    const colorMap = buildColorMap(allBoxes);
+    const entries = Object.entries(colorMap);
+
+    return (
+        <div style={{
+            position: 'absolute', bottom: 16, left: 16, background: 'rgba(0,0,0,0.88)',
+            borderRadius: 10, padding: '0.75rem 1rem', backdropFilter: 'blur(8px)',
+            border: '1px solid #2a2a2a', maxWidth: 220,
+        }}>
+            <p style={{ color: '#888888', fontSize: '0.7rem', fontWeight: 700, margin: '0 0 0.5rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Tipo Scatola
+            </p>
+            {entries.map(([tipo, col]) => (
+                <div key={tipo} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: 3, background: col, flexShrink: 0 }} />
+                    <span style={{ color: '#CCCCCC', fontSize: '0.72rem', fontFamily: 'monospace' }}>{tipo}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function InfoPanel({ box, onClose }: { box: any; onClose: () => void }) {
+    if (!box) return null;
+    return (
+        <div style={{
+            position: 'absolute', top: 16, right: 16,
+            background: 'rgba(0,0,0,0.92)', borderRadius: 12, padding: '1rem 1.2rem',
+            border: '1px solid #2a2a2a', backdropFilter: 'blur(10px)',
+            maxWidth: 260, color: '#FFFFFF',
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#E87A3C' }}>Scatola Selezionata</span>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555555', cursor: 'pointer', fontSize: '1rem' }}>&times;</button>
+            </div>
+            {[
+                ['Prodotto', box.cod_prodotto],
+                ['Scatola', box.codice_scatola],
+                ['Dimensioni', `${box.placed_l_mm}\u00D7${box.placed_p_mm}\u00D7${box.a_mm} mm`],
+                ['Posizione X/Y', `${box.pos_x_mm} / ${box.pos_y_mm} mm`],
+                ['Quota Z', `${box.pos_z_mm} mm`],
+                ['Pezzi', box.n_pezzi],
+                ['Stato', box.is_piena ? 'PIENA' : `PARZ. ${Math.round(box.fill_ratio * 100)}%`],
+            ].map(([label, val]) => (
+                <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontSize: '0.73rem', color: '#555555' }}>{label}</span>
+                    <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#CCCCCC', textAlign: 'right', maxWidth: 140 }}>{val as string}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function SceneWithPanel({ pallet, colorMap, onSelectBox, selectedBox }: {
+    pallet: any;
+    colorMap: Record<string, string>;
+    onSelectBox: (box: any) => void;
+    selectedBox: any;
+}) {
+    const allBoxes = pallet.layers.flatMap((l: any) => l.scatole);
+    const hU = pallet.altezza_totale_mm / 100;
+    const targetY = hU / 2;
 
     return (
         <>
             <ambientLight intensity={0.6} />
             <directionalLight position={[10, 20, 10]} intensity={1.2} castShadow />
             <directionalLight position={[-10, 10, -5]} intensity={0.4} />
+            <fog attach="fog" args={['#0c1a2e', 40, 100]} />
 
             <PalletFloor l={800} p={1200} />
 
@@ -116,16 +170,16 @@ function Scene({ pallet }: { pallet: any }) {
                     key={`${box.cod_prodotto}-${i}`}
                     box={box}
                     color={getColorForType(box.codice_scatola, colorMap)}
-                    onSelect={setSelectedBox}
-                    isSelected={selectedBox && selectedBox === box}
+                    onSelect={onSelectBox}
+                    isSelected={selectedBox === box}
                 />
             ))}
 
             <OrbitControls
                 makeDefault
                 minDistance={2}
-                maxDistance={40}
-                target={[4, 4, 6]}
+                maxDistance={60}
+                target={[4, targetY, 6]}
                 enableDamping
                 dampingFactor={0.08}
             />
@@ -133,65 +187,7 @@ function Scene({ pallet }: { pallet: any }) {
     );
 }
 
-// ─── Legenda colori ──────────────────────────────────────────────────────────
-function Legend({ pallet }: { pallet: any }) {
-    const allBoxes = pallet.layers.flatMap((l: any) => l.scatole);
-    const colorMap = buildColorMap(allBoxes);
-    const entries = Object.entries(colorMap);
-
-    return (
-        <div style={{
-            position: 'absolute', bottom: 16, left: 16, background: 'rgba(15,36,71,0.85)',
-            borderRadius: 10, padding: '0.75rem 1rem', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.1)', maxWidth: 220,
-        }}>
-            <p style={{ color: '#93C5FD', fontSize: '0.7rem', fontWeight: 700, margin: '0 0 0.5rem', textTransform: 'uppercase', letterSpacing: 1 }}>
-                Tipo Scatola
-            </p>
-            {entries.map(([tipo, col]) => (
-                <div key={tipo} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: col, flexShrink: 0 }} />
-                    <span style={{ color: '#E2E8F0', fontSize: '0.72rem', fontFamily: 'monospace' }}>{tipo}</span>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-// ─── Info box scatola selezionata ─────────────────────────────────────────────
-function InfoPanel({ box, onClose }: { box: any; onClose: () => void }) {
-    if (!box) return null;
-    return (
-        <div style={{
-            position: 'absolute', top: 16, right: 16,
-            background: 'rgba(15,36,71,0.9)', borderRadius: 12, padding: '1rem 1.2rem',
-            border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)',
-            maxWidth: 260, color: '#FFFFFF',
-        }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#93C5FD' }}>📦 Scatola Selezionata</span>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-            </div>
-            {[
-                ['Prodotto', box.cod_prodotto],
-                ['Scatola', box.codice_scatola],
-                ['Dimensioni', `${box.placed_l_mm}×${box.placed_p_mm}×${box.a_mm} mm`],
-                ['Posizione X/Y', `${box.pos_x_mm} / ${box.pos_y_mm} mm`],
-                ['Quota Z', `${box.pos_z_mm} mm`],
-                ['Pezzi', box.n_pezzi],
-                ['Stato', box.is_piena ? '✅ PIENA' : `⚠️ PARZ. ${Math.round(box.fill_ratio * 100)}%`],
-            ].map(([label, val]) => (
-                <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.73rem', color: '#94A3B8' }}>{label}</span>
-                    <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#E2E8F0', textAlign: 'right', maxWidth: 140 }}>{val as string}</span>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-// ─── Pagina principale ───────────────────────────────────────────────────────
-function PalletContent() {
+export default function Pallet3DPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const palletId = Number(searchParams.get('pallet') || '1');
@@ -213,11 +209,8 @@ function PalletContent() {
 
     if (!pallet) {
         return (
-            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F2447', color: '#93C5FD', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-                    <p>Caricamento visualizzazione 3D...</p>
-                </div>
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000000', color: '#888888', fontFamily: 'Inter, sans-serif' }}>
+                <p>Caricamento visualizzazione 3D...</p>
             </div>
         );
     }
@@ -226,28 +219,34 @@ function PalletContent() {
     const colorMap = buildColorMap(allBoxes);
 
     return (
-        <div style={{ minHeight: '100vh', background: '#0F2447', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
+        <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif', overflow: 'hidden' }}>
             {/* Top bar */}
             <div style={{
-                background: 'rgba(10,20,45,0.95)', padding: '0.75rem 1.5rem',
+                background: '#000000', padding: '0.75rem 1.5rem',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                borderBottom: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)',
+                borderBottom: '1px solid #1e1e1e',
                 position: 'sticky', top: 0, zIndex: 10,
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 22 }}>📦</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <Image
+                        src="/logo-stucchi-white.png"
+                        alt="Stucchi"
+                        width={100}
+                        height={52}
+                        style={{ objectFit: 'contain' }}
+                    />
+                    <div style={{ width: 1, height: 28, background: '#2a2a2a' }} />
                     <div>
-                        <h1 style={{ color: '#FFFFFF', margin: 0, fontSize: '1rem', fontWeight: 700 }}>
-                            Visualizzatore 3D — Pallet {pallet.pallet_id}
-                        </h1>
-                        <p style={{ color: '#93C5FD', margin: 0, fontSize: '0.72rem' }}>
-                            {ordine?.nome_cliente} — Ordine {ordine?.numero_ordine} — {allBoxes.length} scatole
-                        </p>
+                        <div style={{ color: '#FFFFFF', fontWeight: 600, fontSize: '0.9rem' }}>
+                            Visualizzatore 3D &mdash; Pallet {pallet.pallet_id}
+                        </div>
+                        <div style={{ color: '#555555', fontSize: '0.72rem' }}>
+                            {ordine?.nome_cliente} &mdash; Ordine {ordine?.numero_ordine} &mdash; {allBoxes.length} scatole
+                        </div>
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    {/* Selettore pallet */}
                     <div style={{ display: 'flex', gap: 6 }}>
                         {Array.from({ length: totalPallets }, (_, i) => i + 1).map(id => (
                             <button
@@ -255,8 +254,8 @@ function PalletContent() {
                                 onClick={() => router.push(`/pallet-3d?pallet=${id}`)}
                                 style={{
                                     padding: '0.4rem 0.75rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700,
-                                    background: id === pallet.pallet_id ? 'linear-gradient(135deg, #2563EB, #1A3C6E)' : 'rgba(255,255,255,0.08)',
-                                    color: '#FFFFFF', border: `1px solid ${id === pallet.pallet_id ? '#60A5FA' : 'rgba(255,255,255,0.15)'}`,
+                                    background: id === pallet.pallet_id ? '#E87A3C' : '#141414',
+                                    color: '#FFFFFF', border: `1px solid ${id === pallet.pallet_id ? '#E87A3C' : '#2a2a2a'}`,
                                 }}
                             >
                                 P{id}
@@ -267,12 +266,12 @@ function PalletContent() {
                     <button
                         onClick={() => router.back()}
                         style={{
-                            padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.1)',
-                            color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)',
+                            padding: '0.5rem 1rem', background: '#141414',
+                            color: '#CCCCCC', border: '1px solid #2a2a2a',
                             borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
                         }}
                     >
-                        ← Risultati 2D
+                        &larr; Risultati 2D
                     </button>
                 </div>
             </div>
@@ -280,40 +279,31 @@ function PalletContent() {
             {/* Stats strip */}
             <div style={{
                 display: 'flex', gap: 24, padding: '0.6rem 1.5rem',
-                background: 'rgba(10,20,45,0.7)', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                background: '#0f0f0f', borderBottom: '1px solid #1a1a1a',
             }}>
                 {[
-                    { label: 'Altezza picco', value: `${pallet.altezza_totale_mm} mm` },
-                    { label: 'Riempimento', value: `${pallet.fill_pct}%` },
-                    { label: 'Scatole', value: allBoxes.length },
-                    { label: 'Step Z', value: pallet.layers.length },
+                    { label: 'Altezza picco', value: `${pallet.altezza_totale_mm} mm`, accent: false },
+                    { label: 'Riempimento', value: `${pallet.fill_pct}%`, accent: true },
+                    { label: 'Scatole', value: allBoxes.length, accent: false },
+                    { label: 'Step Z', value: pallet.layers.length, accent: false },
                 ].map(s => (
                     <div key={s.label} style={{ textAlign: 'center' }}>
-                        <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1rem' }}>{s.value}</div>
-                        <div style={{ color: '#94A3B8', fontSize: '0.68rem' }}>{s.label}</div>
+                        <div style={{ color: s.accent ? '#E87A3C' : '#FFFFFF', fontWeight: 700, fontSize: '1rem' }}>{s.value}</div>
+                        <div style={{ color: '#444444', fontSize: '0.68rem' }}>{s.label}</div>
                     </div>
                 ))}
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ color: '#64748B', fontSize: '0.72rem' }}>🖱️ Drag per ruotare · Scroll per zoom · Click per dettagli</span>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ color: '#333333', fontSize: '0.72rem' }}>Drag per ruotare &middot; Scroll per zoom &middot; Click per dettagli</span>
                 </div>
             </div>
 
             {/* Canvas 3D */}
-            <div style={{ position: 'relative', width: '100%', height: 'calc(100vh - 130px)' }}>
+            <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
                 {pallet && (
                     <Canvas
                         shadows
-                        camera={{
-                            position: [
-                                14,
-                                Math.max((pallet.altezza_totale_mm / 100) * 0.5, 5),
-                                18
-                            ],
-                            fov: 50,
-                            near: 0.1,
-                            far: 500
-                        }}
-                        style={{ background: '#0F2447' }}
+                        camera={{ position: [14, (pallet.altezza_totale_mm / 100) + 8, 22], fov: 45, near: 0.1, far: 500 }}
+                        style={{ display: 'block', width: '100%', height: '100%', background: 'linear-gradient(180deg, #1e3a5f 0%, #0c1a2e 100%)' }}
                     >
                         <Suspense fallback={null}>
                             <SceneWithPanel pallet={pallet} colorMap={colorMap} onSelectBox={setSelectedBox} selectedBox={selectedBox} />
@@ -328,59 +318,5 @@ function PalletContent() {
                 )}
             </div>
         </div>
-    );
-}
-
-// ─── Scena wrapper con state lifting ─────────────────────────────────────────
-function SceneWithPanel({ pallet, colorMap, onSelectBox, selectedBox }: {
-    pallet: any;
-    colorMap: Record<string, string>;
-    onSelectBox: (box: any) => void;
-    selectedBox: any;
-}) {
-    const allBoxes = pallet.layers.flatMap((l: any) => l.scatole);
-    const hU = pallet.altezza_totale_mm / 100; // Altezza reale in unità Three.js
-    const targetY = hU / 2; // Centro verticale
-
-    return (
-        <>
-            <ambientLight intensity={0.7} />
-            <directionalLight position={[10, 20, 10]} intensity={1.2} castShadow />
-            <directionalLight position={[-10, 10, -5]} intensity={0.5} />
-            <directionalLight position={[0, 5, 15]} intensity={0.3} />
-
-            <PalletFloor l={800} p={1200} />
-
-            {allBoxes.map((box: any, i: number) => (
-                <Box3D
-                    key={`${box.cod_prodotto}-${i}`}
-                    box={box}
-                    color={getColorForType(box.codice_scatola, colorMap)}
-                    onSelect={onSelectBox}
-                    isSelected={selectedBox === box}
-                />
-            ))}
-
-            <OrbitControls
-                makeDefault
-                minDistance={5}
-                maxDistance={50}
-                target={[4, targetY, 6]}
-                enableDamping
-                dampingFactor={0.08}
-            />
-        </>
-    );
-}
-
-export default function Pallet3DPage() {
-    return (
-        <Suspense fallback={
-            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F2447', color: '#93C5FD' }}>
-                <div style={{ textAlign: 'center', fontSize: 24 }}>Caricamento 3D...</div>
-            </div>
-        }>
-            <PalletContent />
-        </Suspense>
     );
 }
