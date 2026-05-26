@@ -184,7 +184,9 @@ async def palletize(file: UploadFile = File(...)):
                 "layers": layers_summary,
                 "altezza_totale_mm": p['altezza_totale_mm'],
                 "n_scatole": p['n_scatole'],
-                "fill_pct": p['fill_pct']
+                "fill_pct": p['fill_pct'],
+                "peso_totale_kg": p.get('peso_totale_kg'),   # Peso pallet in kg
+                "peso_parziale": p.get('peso_parziale', False),  # True se pesi incompleti
             })
 
         return JSONResponse(content={

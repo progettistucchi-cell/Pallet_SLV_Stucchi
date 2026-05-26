@@ -49,7 +49,8 @@ def _parse_dimensioni(dim_str: str) -> Optional[tuple]:
 def load_product_db_from_xlsx(xlsx_path: str = None) -> dict:
     """
     Carica il DB prodotti dal file XLSX locale.
-    Ritorna un dict {cod_prodotto: {qta_massima, codice_scatola, l_mm, p_mm, a_mm}}
+    Ritorna un dict {cod_prodotto: {qta_massima, codice_scatola, l_mm, p_mm, a_mm, peso_kg}}
+    NOTA: peso_kg non è presente nell'XLSX → sempre None (caricalo da Supabase).
     """
     import openpyxl
     path = xlsx_path or XLSX_FALLBACK_PATH
@@ -112,7 +113,8 @@ def load_product_db_from_xlsx(xlsx_path: str = None) -> dict:
             'codice_scatola': scatola,
             'l_mm': l_mm,
             'p_mm': p_mm,
-            'a_mm': a_mm
+            'a_mm': a_mm,
+            'peso_kg': None  # Non disponibile nel file XLSX locale
         }
 
     return {'db': db, 'skippati_db': skippati}
@@ -147,6 +149,9 @@ def load_product_db_from_supabase() -> dict:
             p_mm = row.get('p_mm', 0)
             a_mm = row.get('a_mm', 0)
             scatola = row.get('codice_scatola', '')
+            # peso_kg può essere NULL in Supabase se non ancora inserito
+            peso_raw = row.get('peso_kg', None)
+            peso_kg = float(peso_raw) if peso_raw is not None else None
 
             if not all([qta_max, l_mm, p_mm, a_mm]):
                 skippati.append({'cod': cod, 'motivo': 'dati incompleti in Supabase'})
@@ -157,7 +162,8 @@ def load_product_db_from_supabase() -> dict:
                 'codice_scatola': scatola,
                 'l_mm': int(l_mm),
                 'p_mm': int(p_mm),
-                'a_mm': int(a_mm)
+                'a_mm': int(a_mm),
+                'peso_kg': peso_kg  # Peso scatola piena in kg (None = non ancora inserito)
             }
 
         return {'db': db, 'skippati_db': skippati}
@@ -172,11 +178,12 @@ def join_order_with_db(prodotti_ordine: list, db: dict) -> dict:
 
     Args:
         prodotti_ordine: [{cod_prodotto, qta}]
-        db: {cod_prodotto: {qta_massima, codice_scatola, l_mm, p_mm, a_mm}}
+        db: {cod_prodotto: {qta_massima, codice_scatola, l_mm, p_mm, a_mm, peso_kg}}
 
     Returns:
         {
-            "prodotti_ok": [{cod_prodotto, qta, qta_massima, codice_scatola, l_mm, p_mm, a_mm}],
+            "prodotti_ok": [{cod_prodotto, qta, qta_massima, codice_scatola,
+                             l_mm, p_mm, a_mm, peso_kg}],
             "prodotti_non_trovati": [str]
         }
     """
@@ -198,7 +205,8 @@ def join_order_with_db(prodotti_ordine: list, db: dict) -> dict:
             'codice_scatola': info['codice_scatola'],
             'l_mm': info['l_mm'],
             'p_mm': info['p_mm'],
-            'a_mm': info['a_mm']
+            'a_mm': info['a_mm'],
+            'peso_kg': info.get('peso_kg', None)  # Peso scatola piena (None se non inserito)
         })
 
     return {

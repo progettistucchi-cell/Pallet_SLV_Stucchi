@@ -357,6 +357,10 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
                         })
 
                     vp = PALLET_L * PALLET_P * max_h_e
+                    # Ricalcola peso con le scatole eccesso aggiunte
+                    pesi_tutti = [b.get('peso_scatola_kg') for b in tutti]
+                    pesi_noti_e = [p for p in pesi_tutti if p is not None]
+                    peso_tot_e = round(sum(pesi_noti_e), 3) if pesi_noti_e else None
                     pallet_list[-1].update({
                         "layers": layers_e,
                         "altezza_totale_mm": max_h_e,
@@ -367,6 +371,8 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
                         "copertura_base_pct": round(calcola_copertura_base(placed_last) * 100, 1),
                         "warning_copertura": warning_eccesso,
                         "scatole_eccesso": nomi_eccesso,
+                        "peso_totale_kg": peso_tot_e,
+                        "peso_parziale": len(pesi_noti_e) < len(pesi_tutti),
                     })
                 break  # Tutte le scatole gestite, fine ciclo
 
@@ -427,6 +433,12 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
         copertura = calcola_copertura_base(placed)
         warning_copertura = None
 
+        # ─── Calcolo Peso Totale Pallet ─────────────────────────────────────
+        pesi_placed = [b.get('peso_scatola_kg') for b in placed]
+        pesi_noti = [p for p in pesi_placed if p is not None]
+        peso_totale_kg = round(sum(pesi_noti), 3) if pesi_noti else None
+        peso_parziale = len(pesi_noti) < len(pesi_placed)  # True se alcuni pesi mancano
+
         # ─── Costruisci Pseudo-Layers (retrocompatibilità PDF/Immagini) ─────
         z_groups: Dict[int, List[Dict]] = {}
         max_h = 0
@@ -474,6 +486,8 @@ def palletizza_3d(scatole: List[Dict]) -> List[Dict]:
             "fill_pct": fill_pct,
             "copertura_base_pct": round(copertura * 100, 1),
             "warning_copertura": warning_copertura,
+            "peso_totale_kg": peso_totale_kg,       # Somma pesi scatole (None se nessun peso)
+            "peso_parziale": peso_parziale,          # True se qualche scatola non ha il peso
         })
 
         pallet_id += 1

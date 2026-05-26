@@ -1,0 +1,29 @@
+VINCOLI DI PALLETIZZAZIONE IMPLEMENTATI - PROGETTO SLV STUCCHI
+
+Di seguito sono elencati i vincoli di business e le regole di algoritmo che sono stati implementati nel codice (in particolare in `pallet_algorithm_3d.py` e `boxing_algorithm.py`):
+
+1. NON MESCOLAMENTO PRODOTTI (Boxing)
+   Non è mai consentito mischiare prodotti diversi all'interno della stessa scatola. Ogni scatola deve contenere unicamente pezzi dello stesso codice prodotto. I prodotti vengono divisi in scatole "piene" (saturando la capacità) e al massimo una scatola "parziale" per il resto.
+
+2. DIMENSIONI PALLET E TOLLERANZA
+   Le dimensioni di base del pallet sono 800x1200mm (Euro pallet). L'altezza massima nominale è fissata a 1450mm. È applicata una tolleranza di 50mm su tutti e tre gli assi: il sistema permette sbordi massimi fino a 850mm di larghezza, 1250mm di profondità e 1500mm di altezza.
+
+3. COPERTURA MINIMA DELLA BASE (80%) E GESTIONE ECCESSO
+   Il primo strato di scatole deve garantire una copertura potenziale di almeno l'80% della superficie del bancale (800x1200). Se le scatole rimanenti non sono sufficienti a raggiungere questa copertura e se esiste già un pallet precedente, NON viene creato un nuovo pallet. Tutte le scatole restanti vengono trattate come "eccesso" e impilate in cima all'ultimo pallet creato, anche se questo comporta il superamento del limite di altezza massima consentita.
+
+4. ORIENTAZIONI MULTIPLE
+   Le scatole standard possono essere posizionate sfruttando fino a 6 diverse orientazioni nello spazio tridimensionale (incluse le posizioni in verticale), in modo da incastrarsi al meglio negli spazi vuoti (Bottom-Left Fill Heuristic).
+
+5. VINCOLO DI POSIZIONAMENTO SCATOLA "VP4268/0"
+   Il codice scatola VP4268/0 rappresenta un'eccezione rigida:
+   - Può essere posizionato SOLO in orizzontale (mai in verticale).
+   - Il suo lato lungo (1350mm) deve essere SEMPRE parallelo all'asse della profondità del pallet (l'asse Y, quello da 1200mm).
+
+6. RAGGRUPPAMENTO SEQUENZIALE (CONSECUTIVITÀ)
+   I prodotti imballati con lo stesso tipo di scatola (`codice_scatola`) devono essere disposti sul pallet in modo consecutivo. Il sistema inserisce prima le scatole piene e poi le parziali di un determinato prodotto, prima di passare al prodotto successivo. I gruppi di scatole vengono inseriti partendo da quelli con l'impronta a terra (footprint L x P) più grande, per garantire la stabilità posizionando i colli più grossi alla base.
+
+7. STABILITÀ E APPOGGIO MINIMO
+   Ogni scatola che non viene posizionata direttamente a terra (quota Z = 0), ma sopra altre scatole, deve avere una superficie di appoggio garantita di almeno il 70% sulla geometria delle scatole sottostanti. Se l'appoggio è inferiore, la posizione viene scartata per evitare instabilità del carico.
+
+8. ESCLUSIONE SCATOLE "OVERSIZE"
+   Se una scatola presenta dimensioni che, in qualsiasi orientazione possibile, superano le dimensioni massime del pallet (inclusa la tolleranza), viene esclusa dal calcolo (skippata) e inserita nel report come non palletizzata.

@@ -286,6 +286,13 @@ function Pallet3DInner() {
                     { label: 'Riempimento', value: `${pallet.fill_pct}%`, accent: true },
                     { label: 'Scatole', value: allBoxes.length, accent: false },
                     { label: 'Step Z', value: pallet.layers.length, accent: false },
+                    {
+                        label: pallet.peso_parziale ? 'Peso (parz.)' : 'Peso totale',
+                        value: pallet.peso_totale_kg !== null && pallet.peso_totale_kg !== undefined
+                            ? `${pallet.peso_totale_kg.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`
+                            : '—',
+                        accent: false
+                    },
                 ].map(s => (
                     <div key={s.label} style={{ textAlign: 'center' }}>
                         <div style={{ color: s.accent ? '#E87A3C' : '#FFFFFF', fontWeight: 700, fontSize: '1rem' }}>{s.value}</div>

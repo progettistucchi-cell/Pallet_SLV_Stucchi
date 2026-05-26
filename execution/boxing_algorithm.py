@@ -41,7 +41,10 @@ def calcola_boxing(prodotti: List[Dict]) -> Dict:
                     "capacita_max": int,        # pezzi max per scatola
                     "is_piena": bool,           # True se al 100%
                     "fill_ratio": float,        # n_pezzi / capacita_max
-                    "volume_mm3": int           # L×P×A
+                    "volume_mm3": int,          # L×P×A
+                    "peso_scatola_kg": float|None  # Peso totale scatola in kg
+                                               # Piena: peso_kg, Parziale: peso_kg*fill_ratio
+                                               # None se peso non ancora inserito in DB
                 }, ...
             ],
             "riepilogo": {
@@ -63,6 +66,11 @@ def calcola_boxing(prodotti: List[Dict]) -> Dict:
         codice_scatola = p['codice_scatola']
         l, pp, a = p['l_mm'], p['p_mm'], p['a_mm']
         volume = l * pp * a
+        peso_kg = p.get('peso_kg', None)  # Peso scatola piena dal DB
+
+        if peso_kg is None:
+            print(f"  WARN Peso non disponibile per {cod} ({codice_scatola}): "
+                  f"peso_scatola_kg sarà None. Inserisci il peso in Supabase.")
 
         if qta <= 0:
             continue
@@ -86,7 +94,8 @@ def calcola_boxing(prodotti: List[Dict]) -> Dict:
                 "capacita_max": qta_max,
                 "is_piena": True,
                 "fill_ratio": 1.0,
-                "volume_mm3": volume
+                "volume_mm3": volume,
+                "peso_scatola_kg": peso_kg  # Scatola piena: peso invariato
             })
             box_id += 1
             scatole_prodotto_piene += 1
@@ -94,6 +103,9 @@ def calcola_boxing(prodotti: List[Dict]) -> Dict:
         # Scatola parziale (se c'è resto)
         if resto > 0:
             fill = round(resto / qta_max, 4)
+            # Peso proporzionale: (peso_scatola_piena / pezzi_max) × pezzi_reali
+            # Usa direttamente gli interi per evitare doppio arrotondamento via fill_ratio
+            peso_parziale = round((peso_kg / qta_max) * resto, 3) if peso_kg is not None else None
             scatole.append({
                 "id": box_id,
                 "cod_prodotto": cod,
@@ -105,7 +117,8 @@ def calcola_boxing(prodotti: List[Dict]) -> Dict:
                 "capacita_max": qta_max,
                 "is_piena": False,
                 "fill_ratio": fill,
-                "volume_mm3": volume
+                "volume_mm3": volume,
+                "peso_scatola_kg": peso_parziale  # Peso proporzionale al riempimento
             })
             box_id += 1
             scatole_prodotto_parziali += 1

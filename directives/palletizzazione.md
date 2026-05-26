@@ -76,3 +76,13 @@ openpyxl, supabase, rectpack, reportlab, matplotlib, Pillow, fastapi, uvicorn, p
 
 ## Aggiornamenti
 - 2026-03-02: Prima versione. File SAP: UTF-16 TSV, col [7] = codice prodotto, col [9] = quantità.
+- 2026-05-26: Aggiunto calcolo peso per pallet.
+  - Supabase: colonna `peso_kg NUMERIC(10,3)` aggiunta a `product_boxes` (peso scatola piena in kg).
+  - `boxing_algorithm.py`: campo `peso_scatola_kg` per ogni scatola.
+    - Piena: `peso_scatola_kg = peso_kg`
+    - Parziale: `peso_scatola_kg = peso_kg × fill_ratio`
+    - Se NULL: `peso_scatola_kg = None` (warning in log, pipeline non bloccata).
+  - `pallet_algorithm_3d.py`: campo `peso_totale_kg` su ogni pallet dict (somma di tutte le scatole placed).
+    - `peso_parziale = True` se almeno una scatola del pallet non ha il peso.
+  - Frontend: peso mostrato in PalletCard stats, nella stats strip 3D e come KPI globale "Peso Totale Ordine".
+  - XLSX fallback: `peso_kg = None` (campo non disponibile nel file locale).

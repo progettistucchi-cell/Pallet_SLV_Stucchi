@@ -36,6 +36,8 @@ interface Pallet {
     altezza_totale_mm: number;
     n_scatole: number;
     fill_pct: number;
+    peso_totale_kg: number | null;
+    peso_parziale: boolean;
 }
 
 interface PalletResult {
@@ -120,6 +122,12 @@ function PalletCard({ pallet, imgFilenames }: { pallet: Pallet; imgFilenames?: s
                         { label: 'Altezza', value: `${pallet.altezza_totale_mm} mm` },
                         { label: 'Layer', value: `${pallet.layers.length}` },
                         { label: 'Scatole', value: `${pallet.n_scatole}` },
+                        {
+                            label: pallet.peso_parziale ? 'Peso (parz.)' : 'Peso totale',
+                            value: pallet.peso_totale_kg !== null && pallet.peso_totale_kg !== undefined
+                                ? `${pallet.peso_totale_kg.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`
+                                : '—'
+                        },
                     ].map(s => (
                         <div key={s.label} style={{ flex: 1, textAlign: 'center' }}>
                             <div style={{ fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>{s.value}</div>
@@ -351,19 +359,37 @@ export default function ResultsPage() {
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem' }}>
 
                 {/* Stats overview */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
                     {[
-                        { label: 'Pallet Totali', value: result.n_pallet, color: '#1A3C6E' },
-                        { label: 'Scatole Totali', value: result.riepilogo_boxing.n_scatole_totali, color: '#1A3C6E' },
-                        { label: 'Scatole Piene', value: result.riepilogo_boxing.n_scatole_piene, color: '#16A34A' },
-                        { label: 'Scatole Parziali', value: result.riepilogo_boxing.n_scatole_parziali, color: '#D97706' },
+                        { label: 'Pallet Totali', value: result.n_pallet, color: '#1A3C6E', suffix: '' },
+                        { label: 'Scatole Totali', value: result.riepilogo_boxing.n_scatole_totali, color: '#1A3C6E', suffix: '' },
+                        { label: 'Scatole Piene', value: result.riepilogo_boxing.n_scatole_piene, color: '#16A34A', suffix: '' },
+                        { label: 'Scatole Parziali', value: result.riepilogo_boxing.n_scatole_parziali, color: '#D97706', suffix: '' },
+                        {
+                            label: (() => {
+                                const hasParziale = result.pallet_list.some(p => p.peso_parziale);
+                                return hasParziale ? 'Peso Ordine (parz.)' : 'Peso Totale Ordine';
+                            })(),
+                            value: (() => {
+                                const pesiValidi = result.pallet_list
+                                    .map(p => p.peso_totale_kg)
+                                    .filter((p): p is number => p !== null && p !== undefined);
+                                if (pesiValidi.length === 0) return '—';
+                                const tot = pesiValidi.reduce((a, b) => a + b, 0);
+                                return tot.toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                            })(),
+                            color: '#1A3C6E',
+                            suffix: ' kg'
+                        },
                     ].map(s => (
                         <div key={s.label} style={{
                             background: '#FFFFFF', borderRadius: 14, padding: '1.25rem',
                             border: '1px solid #E2E8F0',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center',
                         }}>
-                            <div style={{ fontSize: '2rem', fontWeight: 800, color: s.color }}>{s.value}</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 800, color: s.color }}>
+                                {s.value}{s.suffix}
+                            </div>
                             <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: 2 }}>{s.label}</div>
                         </div>
                     ))}
